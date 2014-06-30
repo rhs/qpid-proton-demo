@@ -1,0 +1,66 @@
+#!/usr/bin/env python
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+import sys
+from common import *
+
+class Drain(EventDispatcher):
+
+    def __init__(self, count, block):
+        self.count = count
+        self.block = block
+        self.rcvd = 0
+
+    def link_open(self, event):
+        link = event.link
+        if self.block:
+            link.flow(self.count)
+        else:
+            link.drain(self.count)
+
+    def link_flow(self, event):
+        if not event.link.draining():
+            event.link.session.connection.close()
+
+    def delivery(self, event):
+        dlv = event.delivery
+        link = dlv.link
+        if not dlv.partial:
+            print "Got message: %s" % link.recv(dlv.pending)
+            self.rcvd += 1
+            dlv.settle()
+        if self.rcvd >= self.count or \
+           (not self.block and not link.draining()):
+            link.session.connection.close()
+
+    def connection_remote_close(self, event):
+        drv.exit()
+
+switches = [a for a in sys.argv[1:] if a.startswith("-")]
+args = [a for a in sys.argv[1:] if not a.startswith("-")]
+
+block = "-b" in switches
+address = args.pop(0) if args else "//localhost"
+count = int(args.pop(0)) if args else 1
+
+coll = Collector()
+pool = Pool(coll)
+pool.incoming(address)
+drv = Driver(coll, Drain(count, block))
+drv.run()
