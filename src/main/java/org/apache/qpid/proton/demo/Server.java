@@ -43,24 +43,6 @@ import java.util.Map;
 public class Server extends AbstractEventHandler
 {
 
-    private class Message {
-
-        private final byte[] bytes;
-
-        public Message(byte[] bytes) {
-            this.bytes = bytes;
-        }
-
-        public byte[] getBytes() {
-            return bytes;
-        }
-
-        public String toString() {
-            return new String(bytes);
-        }
-
-    }
-
     private class MessageStore {
 
         Map<String,Deque<Message>> messages = new HashMap<String,Deque<Message>>();
