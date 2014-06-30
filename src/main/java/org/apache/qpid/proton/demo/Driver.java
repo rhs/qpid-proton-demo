@@ -63,6 +63,19 @@ public class Driver extends AbstractEventHandler
     public void run() throws IOException {
         while (true) {
             processEvents();
+
+            // I don't know if there is a better way to do this, but
+            // the only way canceled selection keys are removed from
+            // the key set is via a select operation, so we do this
+            // first to figure out whether we should exit. Without
+            // this we would block indefinitely when there are only
+            // cancelled keys remaining.
+            selector.selectNow();
+            if (selector.keys().isEmpty()) {
+                selector.close();
+                return;
+            }
+
             selector.selectedKeys().clear();
             selector.select();
 
