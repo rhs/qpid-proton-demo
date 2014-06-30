@@ -52,7 +52,7 @@ class Spout(EventDispatcher):
 switches = [a for a in sys.argv[1:] if a.startswith("-")]
 args = [a for a in sys.argv[1:] if not a.startswith("-")]
 
-address = args.pop(0) if args else "//localhost"
+address = args.pop(0) if args and args[0].startswith("/") else "//localhost"
 count = int(args.pop(0)) if args else 1
 
 coll = Collector()
