@@ -45,42 +45,79 @@ public class Pool
     final private Collector collector;
     final private Map<String,Connection> connections;
 
-    public Pool(Collector collector) {
+    final private LinkConstructor<Sender> outgoingConstructor = new LinkConstructor<Sender> () {
+        public Sender create(Session ssn, String remote, String local) {
+            return newOutgoing(ssn, remote, local);
+        }
+    };
+    final private LinkConstructor<Receiver> incomingConstructor = new LinkConstructor<Receiver> () {
+        public Receiver create(Session ssn, String remote, String local) {
+            return newIncoming(ssn, remote, local);
+        }
+    };
+
+    final private LinkResolver<Sender> outgoingResolver;
+    final private LinkResolver<Receiver> incomingResolver;
+
+    public Pool(Collector collector, final Router router) {
         this.collector = collector;
         connections = new HashMap<String,Connection>();
+
+        if (router != null) {
+            outgoingResolver = new LinkResolver<Sender>() {
+                public Sender resolve(String address) {
+                    return router.getOutgoing(address).choose();
+                }
+            };
+            incomingResolver = new LinkResolver<Receiver>() {
+                public Receiver resolve(String address) {
+                    return router.getIncoming(address).choose();
+                }
+            };
+        } else {
+            outgoingResolver = new LinkResolver<Sender>() {
+                public Sender resolve(String address) { return null; }
+            };
+            incomingResolver = new LinkResolver<Receiver>() {
+                public Receiver resolve(String address) { return null; }
+            };
+        }
     }
 
-    public Link resolve(String remote, String local, boolean outgoing) {
+    public Pool(Collector collector) {
+        this(collector, null);
+    }
+
+    private <T extends Link> T resolve(String remote, String local,
+                                       LinkResolver<T> resolver,
+                                       LinkConstructor<T> constructor) {
         String host = remote.substring(2).split("/", 2)[0];
-        Connection conn = connections.get(host);
-        Link link;
-        if (conn == null) {
-            conn = Connection.Factory.create();
-            conn.collect(collector);
-            conn.setHostname(host);
-            conn.open();
-            connections.put(host, conn);
+        T link = resolver.resolve(remote);
+        if (link == null) {
+            Connection conn = connections.get(host);
+            if (conn == null) {
+                conn = Connection.Factory.create();
+                conn.collect(collector);
+                conn.setHostname(host);
+                conn.open();
+                connections.put(host, conn);
+            }
 
             Session ssn = conn.session();
             ssn.open();
-            if (outgoing) {
-                link = newOutgoing(ssn, remote, local);
-            } else {
-                link = newIncoming(ssn, remote, local);
-            }
+
+            link = constructor.create(ssn, remote, local);
             link.open();
-        } else {
-            throw new RuntimeException("TODO");
         }
         return link;
     }
 
     public Sender outgoing(String target, String source) {
-        return (Sender) resolve(target, source, true);
+        return resolve(target, source, outgoingResolver, outgoingConstructor);
     }
 
     public Receiver incoming(String source, String target) {
-        return (Receiver) resolve(source, target, false);
+        return resolve(source, target, incomingResolver, incomingConstructor);
     }
 
     public Sender newOutgoing(Session ssn, String remote, String local) {
@@ -103,6 +140,14 @@ public class Pool
         tgt.setAddress(remote);
         rcv.setTarget(tgt);
         return rcv;
+    }
+
+    public static interface LinkConstructor<T extends Link> {
+        T create(Session session, String remote, String local);
+    }
+
+    public static interface LinkResolver<T extends Link> {
+        T resolve(String remote);
     }
 
 }
