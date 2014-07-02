@@ -100,7 +100,7 @@ public class Driver extends AbstractEventHandler
 
     public void onTransport(Transport transport) {
         ChannelHandler ch = (ChannelHandler) transport.getContext();
-        ch.update();
+        ch.selected();
     }
 
     public void onOpen(Connection conn) {
@@ -177,7 +177,9 @@ public class Driver extends AbstractEventHandler
             }
         }
 
-        public void selected() throws IOException {
+        public void selected() {
+            if (!key.isValid()) { return; }
+
             try {
                 if (key.isConnectable()) {
                     System.out.println("CONNECTED: " + socket);
@@ -222,7 +224,11 @@ public class Driver extends AbstractEventHandler
             } catch (IOException e) {
                 transport.unbind();
                 System.out.println(String.format("CLOSING(%s): %s", e, socket));
-                socket.close();
+                try {
+                    socket.close();
+                } catch (IOException e2) {
+                    throw new RuntimeException(e2);
+                }
             }
 
         }
