@@ -94,7 +94,7 @@ public class Server extends AbstractEventHandler
         }
 
         int count = 0;
-        while (snd.getCredit() > 0) {
+        while (snd.getCredit() > 0 && snd.getQueued() < 1024) {
             Message msg = messages.get(address);
             if (msg == null) {
                 snd.drained();
