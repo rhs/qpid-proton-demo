@@ -31,8 +31,10 @@ import org.apache.qpid.proton.engine.Sender;
 import java.io.IOException;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -70,10 +72,12 @@ public class Server extends AbstractEventHandler
 
     final private MessageStore messages = new MessageStore();
     final private Router router;
+    private boolean quiet;
     private int tag = 0;
 
-    public Server(Router router) {
+    public Server(Router router, boolean quiet) {
         this.router = router;
+        this.quiet = quiet;
     }
 
     private byte[] nextTag() {
@@ -105,7 +109,9 @@ public class Server extends AbstractEventHandler
             snd.send(bytes, 0, bytes.length);
             dlv.settle();
             count++;
-            System.out.println(String.format("Sent message(%s): %s", address, msg));
+            if (!quiet) {
+                System.out.println(String.format("Sent message(%s): %s", address, msg));
+            }
         }
 
         return count;
@@ -132,19 +138,36 @@ public class Server extends AbstractEventHandler
                 messages.put(address, message);
                 dlv.disposition(Accepted.getInstance());
                 dlv.settle();
-                System.out.println(String.format("Got message(%s): %s", address, message));
+                if (!quiet) {
+                    System.out.println(String.format("Got message(%s): %s", address, message));
+                }
                 send(address);
             }
         }
     }
 
-    public static final void main(String[] args) throws IOException {
+    public static final void main(String[] argv) throws IOException {
+        List<String> switches = new ArrayList<String>();
+        List<String> args = new ArrayList<String>();
+        for (String s : argv) {
+            if (s.startsWith("-")) {
+                switches.add(s);
+            } else {
+                args.add(s);
+            }
+        }
+
+        boolean quiet = switches.contains("-q");
+        String host = !args.isEmpty() && !Character.isDigit(args.get(0).charAt(0)) ?
+            args.remove(0) : "localhost";
+        int port = !args.isEmpty() ? Integer.parseInt(args.remove(0)) : 5672;
+
         Collector collector = Collector.Factory.create();
         Router router = new Router();
         Driver driver = new Driver(collector, new Handshaker(),
                                    new FlowController(1024), router,
-                                   new Server(router));
-        driver.listen("localhost", 5672);
+                                   new Server(router, quiet));
+        driver.listen(host, port);
         driver.run();
     }
 

@@ -17,7 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-import random
+import random, sys
 from common import *
 
 class MessageStore:
@@ -41,8 +41,9 @@ class MessageStore:
 
 class Server(EventDispatcher):
 
-    def __init__(self, router):
+    def __init__(self, router, quiet):
         self.router = router
+        self.quiet = quiet
         self.tag = 0
         self.messages = MessageStore()
 
@@ -58,7 +59,7 @@ class Server(EventDispatcher):
             if snd is None: return 0
 
         count = 0
-        while snd.credit:
+        while snd.credit and snd.queued < 1024:
             msg = self.messages.get(address)
             if not msg:
                 snd.drained()
@@ -67,7 +68,8 @@ class Server(EventDispatcher):
             snd.send(msg)
             dlv.settle()
             count += 1
-            print "Sent message(%s): %s" % (address, msg)
+            if not self.quiet:
+                print "Sent message(%s): %s" % (address, msg)
 
         return count
 
@@ -84,11 +86,19 @@ class Server(EventDispatcher):
             self.messages.add(address, msg)
             dlv.update(Delivery.ACCEPTED)
             dlv.settle()
-            print "Got message(%s): %s" % (address, msg)
+            if not self.quiet:
+                print "Got message(%s): %s" % (address, msg)
             self.send(address)
+
+switches = [a for a in sys.argv[1:] if a.startswith("-")]
+args = [a for a in sys.argv[1:] if not a.startswith("-")]
+
+quiet = "-q" in switches
+host = args.pop(0) if args and not args[0].isdigit() else "localhost"
+port = int(args.pop(0)) if args else 5672
 
 coll = Collector()
 router = Router()
-drv = Driver(coll, FlowController(1024), Handshaker(), router, Server(router))
-acc = Acceptor(drv, "localhost", 5672)
+drv = Driver(coll, FlowController(1024), Handshaker(), router, Server(router, quiet))
+acc = Acceptor(drv, host, port)
 drv.run()

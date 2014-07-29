@@ -34,10 +34,12 @@ public class Drain extends AbstractEventHandler {
     private int count;
     private boolean block;
     private int received;
+    private boolean quiet;
 
-    public Drain(int count, boolean block) {
+    public Drain(int count, boolean block, boolean quiet) {
         this.count = count;
         this.block = block;
+        this.quiet = quiet;
     }
 
     @Override
@@ -74,7 +76,9 @@ public class Drain extends AbstractEventHandler {
                 receiver.recv(bytes, 0, bytes.length);
                 Message msg = new Message(bytes);
 
-                System.out.println(String.format("Got message: %s", msg));
+                if (!quiet) {
+                    System.out.println(String.format("Got message: %s", msg));
+                }
                 received++;
                 dlv.settle();
             }
@@ -83,6 +87,11 @@ public class Drain extends AbstractEventHandler {
                 receiver.getSession().getConnection().close();
             }
         }
+    }
+
+    @Override
+    public void onRemoteClose(Connection conn) {
+        System.out.println(String.format("Got %s messages", received));
     }
 
     public static void main(String[] argv) throws Exception {
@@ -96,13 +105,14 @@ public class Drain extends AbstractEventHandler {
             }
         }
 
+        boolean quiet = switches.contains("-q");
         String address = args.isEmpty() || !args.get(0).startsWith("/") ? "//localhost" : args.remove(0);
         int count = args.isEmpty() ? 1 : Integer.parseInt(args.remove(0));
         boolean block = switches.contains("-b");
 
         Collector collector = Collector.Factory.create();
 
-        Drain drain = new Drain(count, block);
+        Drain drain = new Drain(count, block, quiet);
         Driver driver = new Driver(collector, drain);
 
         Pool pool = new Pool(collector);

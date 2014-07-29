@@ -34,9 +34,11 @@ public class Spout extends AbstractEventHandler
     private int count;
     private int sent;
     private int settled;
+    private boolean quiet;
 
-    public Spout(int count) {
+    public Spout(int count, boolean quiet) {
         this.count = count;
+        this.quiet = quiet;
     }
 
     @Override
@@ -51,8 +53,10 @@ public class Spout extends AbstractEventHandler
                 sender.send(bytes, 0, bytes.length);
                 sender.advance();
 
-                System.out.println(String.format("Sent %s to %s: %s", new String(dlv.getTag()),
-                                                 sender.getTarget().getAddress(), msg));
+                if (!quiet) {
+                    System.out.println(String.format("Sent %s to %s: %s", new String(dlv.getTag()),
+                                                     sender.getTarget().getAddress(), msg));
+                }
                 sent++;
             }
         }
@@ -61,7 +65,9 @@ public class Spout extends AbstractEventHandler
     @Override
     public void onDelivery(Delivery dlv) {
         if (dlv.remotelySettled()) {
-            System.out.println(String.format("Settled %s: %s", new String(dlv.getTag()), dlv.getRemoteState()));
+            if (!quiet) {
+                System.out.println(String.format("Settled %s: %s", new String(dlv.getTag()), dlv.getRemoteState()));
+            }
             dlv.settle();
             settled++;
         }
@@ -69,6 +75,11 @@ public class Spout extends AbstractEventHandler
         if (settled >= count) {
             dlv.getLink().getSession().getConnection().close();
         }
+    }
+
+    @Override
+    public void onRemoteClose(Connection conn) {
+        System.out.println("settled: " + settled);
     }
 
     public static void main(String[] argv) throws Exception {
@@ -82,13 +93,14 @@ public class Spout extends AbstractEventHandler
             }
         }
 
+        boolean quiet = switches.contains("-q");
         String address = !args.isEmpty() && args.get(0).startsWith("/") ?
             args.remove(0) : "//localhost";
         int count = !args.isEmpty() ? Integer.parseInt(args.remove(0)) : 1;
 
         Collector collector = Collector.Factory.create();
 
-        Spout spout = new Spout(count);
+        Spout spout = new Spout(count, quiet);
 
         Driver driver = new Driver(collector, spout);
 

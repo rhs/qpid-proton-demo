@@ -22,9 +22,10 @@ from common import *
 
 class Drain(EventDispatcher):
 
-    def __init__(self, count, block):
+    def __init__(self, count, block, quiet):
         self.count = count
         self.block = block
+        self.quiet = quiet
         self.rcvd = 0
 
     def link_open(self, event):
@@ -42,7 +43,8 @@ class Drain(EventDispatcher):
         dlv = event.delivery
         link = dlv.link
         if not dlv.partial:
-            print "Got message: %s" % link.recv(dlv.pending)
+            if not self.quiet:
+                print "Got message: %s" % link.recv(dlv.pending)
             self.rcvd += 1
             dlv.settle()
         if self.rcvd >= self.count or \
@@ -50,11 +52,13 @@ class Drain(EventDispatcher):
             link.session.connection.close()
 
     def connection_remote_close(self, event):
+        print "Got %s messages" % self.rcvd
         drv.exit()
 
 switches = [a for a in sys.argv[1:] if a.startswith("-")]
 args = [a for a in sys.argv[1:] if not a.startswith("-")]
 
+quiet = "-q" in switches
 block = "-b" in switches
 address = args.pop(0) if args and args[0].startswith("/") else "//localhost"
 count = int(args.pop(0)) if args else 1
@@ -62,5 +66,5 @@ count = int(args.pop(0)) if args else 1
 coll = Collector()
 pool = Pool(coll)
 pool.incoming(address)
-drv = Driver(coll, Drain(count, block))
+drv = Driver(coll, Drain(count, block, quiet))
 drv.run()

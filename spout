@@ -22,8 +22,9 @@ from common import *
 
 class Spout(EventDispatcher):
 
-    def __init__(self, count):
+    def __init__(self, count, quiet):
         self.count = count
+        self.quiet = quiet
         self.sent = 0
         self.settled = 0
 
@@ -34,29 +35,33 @@ class Spout(EventDispatcher):
             msg = "Hello World! [%s]" % self.sent
             link.send(msg)
             link.advance()
-            print "Sent %s to %s: %s" % (dlv.tag, link.target.address, msg)
+            if not self.quiet:
+                print "Sent %s to %s: %s" % (dlv.tag, link.target.address, msg)
             self.sent += 1
 
     def delivery(self, event):
         dlv = event.delivery
         if dlv.settled:
-            print "Settled %s: %s" % (dlv.tag, dlv.remote_state)
+            if not self.quiet:
+                print "Settled %s: %s" % (dlv.tag, dlv.remote_state)
             self.settled += 1
             dlv.settle()
         if self.settled >= self.count:
             event.connection.close()
 
     def connection_remote_close(self, event):
+        print "Sent %s messages" % self.settled
         drv.exit()
 
 switches = [a for a in sys.argv[1:] if a.startswith("-")]
 args = [a for a in sys.argv[1:] if not a.startswith("-")]
 
+quiet = "-q" in switches
 address = args.pop(0) if args and args[0].startswith("/") else "//localhost"
 count = int(args.pop(0)) if args else 1
 
 coll = Collector()
 pool = Pool(coll)
 pool.outgoing(address)
-drv = Driver(coll, Spout(count))
+drv = Driver(coll, Spout(count, quiet))
 drv.run()
