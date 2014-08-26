@@ -53,6 +53,9 @@ class EventDispatcher:
     def dispatch(self, event):
         getattr(self, self.methods[event.type], self.unhandled)(event)
 
+    def quiesced(self):
+        pass
+
     def unhandled(self, event):
         pass
 
@@ -198,15 +201,21 @@ class Driver(EventDispatcher):
                 s.writable()
 
     def process_events(self):
+        quiesced = False
         while True:
             ev = self.collector.peek()
             if ev:
+                quiesced = False
                 self.dispatch(ev)
                 for d in self.dispatchers:
                     d.dispatch(ev)
                 self.collector.pop()
-            else:
+            elif quiesced:
                 return
+            else:
+                for d in self.dispatchers:
+                    d.quiesced()
+                quiesced = True
 
     def connection_open(self, event):
         conn = event.connection
