@@ -20,10 +20,12 @@
  */
 package org.apache.qpid.proton.demo;
 
+import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Connection;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.EndpointState;
 import org.apache.qpid.proton.engine.Event;
+import org.apache.qpid.proton.engine.Handler;
 import org.apache.qpid.proton.engine.Sasl;
 import org.apache.qpid.proton.engine.Transport;
 import org.apache.qpid.proton.engine.TransportException;
@@ -43,14 +45,14 @@ import java.nio.channels.SocketChannel;
  *
  */
 
-public class Driver extends AbstractEventHandler
+public class Driver extends BaseHandler
 {
 
     final private Collector collector;
-    final private EventHandler[] handlers;
+    final private Handler[] handlers;
     final private Selector selector;
 
-    public Driver(Collector collector, EventHandler ... handlers) throws IOException {
+    public Driver(Collector collector, Handler ... handlers) throws IOException {
         this.collector = collector;
         this.handlers = handlers;
         this.selector = Selector.open();
@@ -90,20 +92,24 @@ public class Driver extends AbstractEventHandler
         while (true) {
             Event ev = collector.peek();
             if (ev == null) break;
-            Events.dispatch(ev, this);
-            for (EventHandler h : handlers) {
-                Events.dispatch(ev, h);
+            ev.dispatch(this);
+            for (Handler h : handlers) {
+                ev.dispatch(h);
             }
             collector.pop();
         }
     }
 
-    public void onTransport(Transport transport) {
+    @Override
+    public void onTransport(Event evt) {
+        Transport transport = evt.getTransport();
         ChannelHandler ch = (ChannelHandler) transport.getContext();
         ch.selected();
     }
 
-    public void onOpen(Connection conn) {
+    @Override
+    public void onConnectionLocalOpen(Event evt) {
+        Connection conn = evt.getConnection();
         if (conn.getRemoteState() == EndpointState.UNINITIALIZED) {
             try {
                 new Connector(conn);

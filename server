@@ -39,7 +39,7 @@ class MessageStore:
             if not queue: del self.messages[address]
             return msg
 
-class Server(EventDispatcher):
+class Server(Handler):
 
     def __init__(self, router, quiet):
         self.router = router
@@ -73,12 +73,12 @@ class Server(EventDispatcher):
 
         return count
 
-    def link_flow(self, event):
+    def on_link_flow(self, event):
         if event.link.is_sender:
             snd = event.link
             self.send(snd.source.address or snd.target.address, snd)
 
-    def delivery(self, event):
+    def on_delivery(self, event):
         dlv = event.delivery
         if dlv.link.is_receiver and not dlv.partial:
             address = dlv.link.target.address

@@ -21,44 +21,6 @@ from proton import *
 from socket import *
 from select import select
 
-class EventDispatcher:
-
-    methods = {
-        Event.CONNECTION_INIT: "connection_init",
-        Event.CONNECTION_OPEN: "connection_open",
-        Event.CONNECTION_REMOTE_OPEN: "connection_remote_open",
-        Event.CONNECTION_CLOSE: "connection_close",
-        Event.CONNECTION_REMOTE_CLOSE: "connection_remote_close",
-        Event.CONNECTION_FINAL: "connection_final",
-
-        Event.SESSION_INIT: "session_init",
-        Event.SESSION_OPEN: "session_open",
-        Event.SESSION_REMOTE_OPEN: "session_remote_open",
-        Event.SESSION_CLOSE: "session_close",
-        Event.SESSION_REMOTE_CLOSE: "session_remote_close",
-        Event.SESSION_FINAL: "session_final",
-
-        Event.LINK_INIT: "link_init",
-        Event.LINK_OPEN: "link_open",
-        Event.LINK_REMOTE_OPEN: "link_remote_open",
-        Event.LINK_CLOSE: "link_close",
-        Event.LINK_REMOTE_CLOSE: "link_remote_close",
-        Event.LINK_FLOW: "link_flow",
-        Event.LINK_FINAL: "link_final",
-
-        Event.TRANSPORT: "transport",
-        Event.DELIVERY: "delivery"
-    }
-
-    def dispatch(self, event):
-        getattr(self, self.methods[event.type], self.unhandled)(event)
-
-    def quiesced(self):
-        pass
-
-    def unhandled(self, event):
-        pass
-
 class Selectable:
 
     def __init__(self, transport, socket):
@@ -163,11 +125,11 @@ class Acceptor:
             sel = Selectable(transport, sock)
             self.driver.selectables.append(sel)
 
-class Driver(EventDispatcher):
+class Driver(Handler):
 
-    def __init__(self, collector, *dispatchers):
+    def __init__(self, collector, *handlers):
         self.collector = collector
-        self.dispatchers = dispatchers
+        self.handlers = handlers
         self.selectables = []
         self._abort = False
         self._exit = False
@@ -206,18 +168,19 @@ class Driver(EventDispatcher):
             ev = self.collector.peek()
             if ev:
                 quiesced = False
-                self.dispatch(ev)
-                for d in self.dispatchers:
-                    d.dispatch(ev)
+                ev.dispatch(self)
+                for h in self.handlers:
+                    ev.dispatch(h)
                 self.collector.pop()
             elif quiesced:
                 return
             else:
-                for d in self.dispatchers:
-                    d.quiesced()
+                for h in self.handlers:
+                    if hasattr(h, "quiesced"):
+                        h.quiesced()
                 quiesced = True
 
-    def connection_open(self, event):
+    def on_connection_local_open(self, event):
         conn = event.connection
         if conn.state & Endpoint.REMOTE_UNINIT:
             transport = Transport()
@@ -231,41 +194,41 @@ class Driver(EventDispatcher):
             selectable = Selectable(transport, sock)
             self.selectables.append(selectable)
 
-class Handshaker(EventDispatcher):
+class Handshaker(Handler):
 
-    def connection_remote_open(self, event):
+    def on_connection_remote_open(self, event):
         conn = event.connection
         if conn.state & Endpoint.LOCAL_UNINIT:
             conn.open()
 
-    def session_remote_open(self, event):
+    def on_session_remote_open(self, event):
         ssn = event.session
         if ssn.state & Endpoint.LOCAL_UNINIT:
             ssn.open()
 
-    def link_remote_open(self, event):
+    def on_link_remote_open(self, event):
         link = event.link
         if link.state & Endpoint.LOCAL_UNINIT:
             link.source.copy(link.remote_source)
             link.target.copy(link.remote_target)
             link.open()
 
-    def connection_remote_close(self, event):
+    def on_connection_remote_close(self, event):
         conn = event.connection
         if not (conn.state & Endpoint.LOCAL_CLOSED):
             conn.close()
 
-    def session_remote_close(self, event):
+    def on_session_remote_close(self, event):
         ssn = event.session
         if not (ssn.state & Endpoint.LOCAL_CLOSED):
             ssn.close()
 
-    def link_remote_close(self, event):
+    def on_link_remote_close(self, event):
         link = event.link
         if not (link.state & Endpoint.LOCAL_CLOSED):
             link.close()
 
-class FlowController(EventDispatcher):
+class FlowController(Handler):
 
     def __init__(self, window):
         self.window = window
@@ -274,19 +237,19 @@ class FlowController(EventDispatcher):
         delta = self.window - link.credit
         link.flow(delta)
 
-    def link_open(self, event):
+    def on_link_local_open(self, event):
         if event.link.is_receiver:
             self.top_up(event.link)
 
-    def link_remote_open(self, event):
+    def on_link_remote_open(self, event):
         if event.link.is_receiver:
             self.top_up(event.link)
 
-    def link_flow(self, event):
+    def on_link_flow(self, event):
         if event.link.is_receiver:
             self.top_up(event.link)
 
-    def delivery(self, event):
+    def on_delivery(self, event):
         if event.delivery.link.is_receiver:
             self.top_up(event.delivery.link)
 
@@ -311,7 +274,7 @@ class Row:
         return bool(self.links)
 
 
-class Router(EventDispatcher):
+class Router(Handler):
 
     EMPTY = Row()
 
@@ -355,13 +318,13 @@ class Router(EventDispatcher):
             if not row:
                 del table[address]
 
-    def link_open(self, event):
+    def on_link_local_open(self, event):
         self.add(event.link)
 
-    def link_close(self, event):
+    def on_link_local_close(self, event):
         self.remove(event.link)
 
-    def link_final(self, event):
+    def on_link_final(self, event):
         self.remove(event.link)
 
 class Pool:

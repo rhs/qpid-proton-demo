@@ -20,7 +20,7 @@
 import sys
 from common import *
 
-class Drain(EventDispatcher):
+class Drain(Handler):
 
     def __init__(self, count, block, quiet):
         self.count = count
@@ -28,18 +28,18 @@ class Drain(EventDispatcher):
         self.quiet = quiet
         self.rcvd = 0
 
-    def link_open(self, event):
+    def on_link_local_open(self, event):
         link = event.link
         if self.block:
             link.flow(self.count)
         else:
             link.drain(self.count)
 
-    def link_flow(self, event):
+    def on_link_flow(self, event):
         if not event.link.draining():
             event.link.session.connection.close()
 
-    def delivery(self, event):
+    def on_delivery(self, event):
         dlv = event.delivery
         link = dlv.link
         if not dlv.partial:
@@ -51,7 +51,7 @@ class Drain(EventDispatcher):
            (not self.block and not link.draining()):
             link.session.connection.close()
 
-    def connection_remote_close(self, event):
+    def on_connection_remote_close(self, event):
         print "Got %s messages" % self.rcvd
         drv.exit()
 

@@ -23,13 +23,15 @@ package org.apache.qpid.proton.demo;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Connection;
 import org.apache.qpid.proton.engine.Delivery;
+import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.Link;
 import org.apache.qpid.proton.engine.Receiver;
 
-public class Drain extends AbstractEventHandler {
+public class Drain extends BaseHandler {
 
     private int count;
     private boolean block;
@@ -43,7 +45,8 @@ public class Drain extends AbstractEventHandler {
     }
 
     @Override
-    public void onOpen(Link link) {
+    public void onLinkLocalOpen(Event evt) {
+        Link link = evt.getLink();
         if (link instanceof Receiver) {
             Receiver receiver = (Receiver) link;
 
@@ -56,7 +59,8 @@ public class Drain extends AbstractEventHandler {
     }
 
     @Override
-    public void onFlow(Link link) {
+    public void onLinkFlow(Event evt) {
+        Link link = evt.getLink();
         if (link instanceof Receiver) {
             Receiver receiver = (Receiver) link;
 
@@ -67,7 +71,8 @@ public class Drain extends AbstractEventHandler {
     }
 
     @Override
-    public void onDelivery(Delivery dlv) {
+    public void onDelivery(Event evt) {
+        Delivery dlv = evt.getDelivery();
         if (dlv.getLink() instanceof Receiver) {
             Receiver receiver = (Receiver) dlv.getLink();
 
@@ -90,7 +95,7 @@ public class Drain extends AbstractEventHandler {
     }
 
     @Override
-    public void onRemoteClose(Connection conn) {
+    public void onConnectionRemoteClose(Event evt) {
         System.out.println(String.format("Got %s messages", received));
     }
 

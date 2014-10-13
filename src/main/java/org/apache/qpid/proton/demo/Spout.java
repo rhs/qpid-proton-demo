@@ -23,13 +23,15 @@ package org.apache.qpid.proton.demo;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Connection;
 import org.apache.qpid.proton.engine.Delivery;
+import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.Link;
 import org.apache.qpid.proton.engine.Sender;
 
-public class Spout extends AbstractEventHandler
+public class Spout extends BaseHandler
 {
     private int count;
     private int sent;
@@ -42,7 +44,8 @@ public class Spout extends AbstractEventHandler
     }
 
     @Override
-    public void onFlow(Link link) {
+    public void onLinkFlow(Event evt) {
+        Link link = evt.getLink();
         if (link instanceof Sender) {
             Sender sender = (Sender) link;
             while ((sent < count) && sender.getCredit() > 0) {
@@ -63,7 +66,8 @@ public class Spout extends AbstractEventHandler
     }
 
     @Override
-    public void onDelivery(Delivery dlv) {
+    public void onDelivery(Event evt) {
+        Delivery dlv = evt.getDelivery();
         if (dlv.remotelySettled()) {
             if (!quiet) {
                 System.out.println(String.format("Settled %s: %s", new String(dlv.getTag()), dlv.getRemoteState()));
@@ -78,7 +82,7 @@ public class Spout extends AbstractEventHandler
     }
 
     @Override
-    public void onRemoteClose(Connection conn) {
+    public void onConnectionRemoteClose(Event evt) {
         System.out.println("settled: " + settled);
     }
 

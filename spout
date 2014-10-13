@@ -20,7 +20,7 @@
 import sys
 from common import *
 
-class Spout(EventDispatcher):
+class Spout(Handler):
 
     def __init__(self, count, quiet):
         self.count = count
@@ -28,7 +28,7 @@ class Spout(EventDispatcher):
         self.sent = 0
         self.settled = 0
 
-    def link_flow(self, event):
+    def on_link_flow(self, event):
         link = event.link
         while self.sent < self.count and link.credit > 0:
             dlv = link.delivery("spout-%s" % self.sent)
@@ -39,7 +39,8 @@ class Spout(EventDispatcher):
                 print "Sent %s to %s: %s" % (dlv.tag, link.target.address, msg)
             self.sent += 1
 
-    def delivery(self, event):
+    def on_delivery(self, event):
+        conn = event.connection
         dlv = event.delivery
         if dlv.settled:
             if not self.quiet:
@@ -47,9 +48,9 @@ class Spout(EventDispatcher):
             self.settled += 1
             dlv.settle()
         if self.settled >= self.count:
-            event.connection.close()
+            conn.close()
 
-    def connection_remote_close(self, event):
+    def on_connection_remote_close(self, event):
         print "Sent %s messages" % self.settled
         drv.exit()
 

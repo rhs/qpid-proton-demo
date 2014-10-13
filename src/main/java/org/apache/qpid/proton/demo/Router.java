@@ -22,6 +22,8 @@ package org.apache.qpid.proton.demo;
 
 import org.apache.qpid.proton.amqp.transport.Source;
 import org.apache.qpid.proton.amqp.transport.Target;
+import org.apache.qpid.proton.engine.BaseHandler;
+import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.Link;
 import org.apache.qpid.proton.engine.Receiver;
 import org.apache.qpid.proton.engine.Sender;
@@ -39,7 +41,7 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  */
 
-public class Router extends AbstractEventHandler
+public class Router extends BaseHandler
 {
 
     public static class Routes<T extends Link> {
@@ -171,16 +173,19 @@ public class Router extends AbstractEventHandler
         }
     }
 
-    public void onOpen(Link link) {
-        add(link);
+    @Override
+    public void onLinkLocalOpen(Event evt) {
+        add(evt.getLink());
     }
 
-    public void onClose(Link link) {
-        add(link);
+    @Override
+    public void onLinkLocalClose(Event evt) {
+        remove(evt.getLink());
     }
 
-    public void onFinal(Link link) {
-        add(link);
+    @Override
+    public void onLinkFinal(Event evt) {
+        remove(evt.getLink());
     }
 
 }

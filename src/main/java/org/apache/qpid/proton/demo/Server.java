@@ -21,11 +21,12 @@
 package org.apache.qpid.proton.demo;
 
 import org.apache.qpid.proton.amqp.messaging.Accepted;
-import org.apache.qpid.proton.engine.Receiver;
+import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Collector;
 import org.apache.qpid.proton.engine.Delivery;
 import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.Link;
+import org.apache.qpid.proton.engine.Receiver;
 import org.apache.qpid.proton.engine.Sender;
 
 import java.io.IOException;
@@ -42,7 +43,7 @@ import java.util.Map;
  *
  */
 
-public class Server extends AbstractEventHandler
+public class Server extends BaseHandler
 {
 
     private class MessageStore {
@@ -117,14 +118,18 @@ public class Server extends AbstractEventHandler
         return count;
     }
 
-    public void onFlow(Link link) {
+    @Override
+    public void onLinkFlow(Event evt) {
+        Link link = evt.getLink();
         if (link instanceof Sender) {
             Sender snd = (Sender) link;
             send(router.getAddress(snd), snd);
         }
     }
 
-    public void onDelivery(Delivery dlv) {
+    @Override
+    public void onDelivery(Event evt) {
+        Delivery dlv = evt.getDelivery();
         Link link = dlv.getLink();
         if (link instanceof Sender) {
             dlv.settle();

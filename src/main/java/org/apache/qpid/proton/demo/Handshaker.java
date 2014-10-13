@@ -20,32 +20,40 @@
  */
 package org.apache.qpid.proton.demo;
 
+import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Connection;
-import org.apache.qpid.proton.engine.Session;
-import org.apache.qpid.proton.engine.Link;
 import org.apache.qpid.proton.engine.EndpointState;
+import org.apache.qpid.proton.engine.Event;
+import org.apache.qpid.proton.engine.Link;
+import org.apache.qpid.proton.engine.Session;
 
 /**
  * Handshaker
  *
  */
 
-public class Handshaker extends AbstractEventHandler
+public class Handshaker extends BaseHandler
 {
 
-    public void onRemoteOpen(Connection conn) {
+    @Override
+    public void onConnectionRemoteOpen(Event evt) {
+        Connection conn = evt.getConnection();
         if (conn.getLocalState() == EndpointState.UNINITIALIZED) {
             conn.open();
         }
     }
 
-    public void onRemoteOpen(Session ssn) {
+    @Override
+    public void onSessionRemoteOpen(Event evt) {
+        Session ssn = evt.getSession();
         if (ssn.getLocalState() == EndpointState.UNINITIALIZED) {
             ssn.open();
         }
     }
 
-    public void onRemoteOpen(Link link) {
+    @Override
+    public void onLinkRemoteOpen(Event evt) {
+        Link link = evt.getLink();
         if (link.getLocalState() == EndpointState.UNINITIALIZED) {
             link.setSource(link.getRemoteSource());
             link.setTarget(link.getRemoteTarget());
@@ -53,19 +61,25 @@ public class Handshaker extends AbstractEventHandler
         }
     }
 
-    public void onRemoteClose(Connection conn) {
+    @Override
+    public void onConnectionRemoteClose(Event evt) {
+        Connection conn = evt.getConnection();
         if (conn.getLocalState() != EndpointState.CLOSED) {
             conn.close();
         }
     }
 
-    public void onRemoteClose(Session ssn) {
+    @Override
+    public void onSessionRemoteClose(Event evt) {
+        Session ssn = evt.getSession();
         if (ssn.getLocalState() != EndpointState.CLOSED) {
             ssn.close();
         }
     }
 
-    public void onRemoteClose(Link link) {
+    @Override
+    public void onLinkRemoteClose(Event evt) {
+        Link link = evt.getLink();
         if (link.getLocalState() != EndpointState.CLOSED) {
             link.close();
         }

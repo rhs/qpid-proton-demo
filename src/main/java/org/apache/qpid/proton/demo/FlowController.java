@@ -20,7 +20,9 @@
  */
 package org.apache.qpid.proton.demo;
 
+import org.apache.qpid.proton.engine.BaseHandler;
 import org.apache.qpid.proton.engine.Delivery;
+import org.apache.qpid.proton.engine.Event;
 import org.apache.qpid.proton.engine.Link;
 import org.apache.qpid.proton.engine.Receiver;
 
@@ -29,7 +31,7 @@ import org.apache.qpid.proton.engine.Receiver;
  *
  */
 
-public class FlowController extends AbstractEventHandler
+public class FlowController extends BaseHandler
 {
 
     final private int window;
@@ -43,26 +45,33 @@ public class FlowController extends AbstractEventHandler
         rcv.flow(delta);
     }
 
-    public void onOpen(Link link) {
+    @Override
+    public void onLinkLocalOpen(Event evt) {
+        Link link = evt.getLink();
         if (link instanceof Receiver) {
             topUp((Receiver) link);
         }
     }
 
-    public void onRemoteOpen(Link link) {
+    @Override
+    public void onLinkRemoteOpen(Event evt) {
+        Link link = evt.getLink();
         if (link instanceof Receiver) {
             topUp((Receiver) link);
         }
     }
 
-    public void onLinkFlow(Link link) {
+    @Override
+    public void onLinkFlow(Event evt) {
+        Link link = evt.getLink();
         if (link instanceof Receiver) {
             topUp((Receiver) link);
         }
     }
 
-    public void onDelivery(Delivery delivery) {
-        Link link = delivery.getLink();
+    @Override
+    public void onDelivery(Event evt) {
+        Link link = evt.getLink();
         if (link instanceof Receiver) {
             topUp((Receiver) link);
         }
